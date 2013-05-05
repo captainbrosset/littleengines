@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+<head lang="en">
+	<meta charset="UTF-8">
+	<title>little engines</title>
+	<style>
+		body {
+			background: black;
+		}
+		#canvas .trail {
+			
+		}
+	</style>
+</head>
+<body>
+	<div id="canvas"></div>
+	<div id="controls">
+		<button onclick="toggle()">Start/Stop</button>
+		<button onclick="next()">Next</button>
+		<button onclick="add()">Add</button>
+	</div>
+	<script src="littleengines.js"></script>
+	<script>
+		var set = new LittleEnginesSet(document.getElementById('canvas'), 600, 600);
+
+		function toggle() {
+			set.toggle();
+		}
+
+		function next() {
+			set.next();
+		}
+
+		function add() {
+			set.clearTrail();
+			set.addEngine({
+				x: Math.floor((Math.random() * 500) + 50),
+				y: Math.floor((Math.random() * 500) + 50),
+				r: Math.floor((Math.random() * 50) + 50),
+				a: 0,
+				s: Math.PI / Math.floor((Math.random() * 50) + 50),
+			});
+		}
+	</script>
+</body>
+</html>
