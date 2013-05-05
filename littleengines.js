@@ -27,11 +27,11 @@
     }
   });
 
-  function drawDot(x, y, color, ctx) {
+  function drawDot(x, y, color, size, ctx) {
     ctx.save();
     ctx.fillStyle = color;
     ctx.beginPath();
-    ctx.arc(x, y, 3, 0, 2 * Math.PI, false);
+    ctx.arc(x, y, size, 0, 2 * Math.PI, false);
     ctx.fill();
     ctx.closePath();
     ctx.restore();
@@ -45,11 +45,13 @@
    * @param {Number} width
    * @param {Number} height
    */
-  var LittleEnginesSet = function(rootEl, width, height) {
+  var LittleEnginesSet = function(rootEl, width, height, color, size) {
     this._rootEl = rootEl || root.document.body;
     this._engineCtx = this._trailCtx = null;
     this._width = width || 400;
     this._height = height || 400;
+    this._color = color || 'rgba(255,105,200,.5)';
+    this._size = size || 1;
     this._engines = new Set();
     this.isRunning = false;
 
@@ -86,15 +88,38 @@
       this._engines.clear();
     },
 
+    _isCircleEngine: function(e) {
+      return e.x !== undefined &&
+             e.y !== undefined &&
+             e.r !== undefined &&
+             e.a !== undefined &&
+             e.s !== undefined;
+    },
+
+    _isCustomEngine: function(e) {
+      return e.x !== undefined &&
+             e.y !== undefined &&
+             e.getXY !== undefined;
+    },
+
     /**
      * Add a new engine to the set
      * @param {Object} The engine configuration object.
-     * The simplest form is {x,y,r,a,s} with x/y being the coordinates of the center of the engine,
-     * r being the radius, a the start angle and s the rotation speed.
+     * The most usual way to add an engine is to pass the following properties:
+     * {x,y,r,a,s} with x/y being the coordinates of the center of the engine,
+     * r being the radius, a the start angle and s the rotation speed. In this case
+     * the engine will describe a circle. If you want something else, pass:
+     * {x,y,getXY} with x/y being the center and getXY being a function.
+     * This function will be called at each step of the animation in the scope
+     * of the engine, so up to you to add state properties to the engine object
      * @return {Object} The engine object, to be used with removeEngine
      */
     addEngine: function(engine) {
-      return this._engines.add(engine) || engine;
+      if(this._isCircleEngine(engine) || this._isCustomEngine(engine)) {
+        return this._engines.add(engine) || engine;
+      } else {
+        throw new Error('Engine is neither a circle nor custom');
+      }
     },
 
     removeEngine: function(engine) {
@@ -120,14 +145,21 @@
     next: function() {
       this._engineCtx.clearRect(0, 0, this._engineCtx.canvas.width, this._engineCtx.canvas.height);
 
-      var linksCoordinates = [];
+      var linksCoordinates = [], posX, posY;
 
       // Engines
       this._engineCtx.strokeStyle = 'rgba(255,255,255,.5)';
       this._engineCtx.lineWidth = 2;
       for(var engine of this._engines) {
-        var posX = engine.x + (engine.r * Math.cos(engine.a)),
-            posY = engine.y + (engine.r * Math.sin(engine.a));
+        if(this._isCustomEngine(engine)) {
+          var posXY = engine.getXY();
+          posX = posXY.x;
+          posY = posXY.y;
+        } else {
+          posX = engine.x + (engine.r * Math.cos(engine.a));
+          posY = engine.y + (engine.r * Math.sin(engine.a));
+          engine.a += engine.s;
+        }
 
         this._engineCtx.beginPath();
         this._engineCtx.moveTo(engine.x, engine.y);
@@ -135,10 +167,8 @@
         this._engineCtx.closePath();
         this._engineCtx.stroke();
 
-        drawDot(engine.x, engine.y, 'rgba(255,255,255,.5)', this._engineCtx);
-        drawDot(posX, posY, 'rgba(255,255,255,.5)', this._engineCtx);
-
-        engine.a += engine.s;
+        drawDot(engine.x, engine.y, 'rgba(255,255,255,.5)', 1, this._engineCtx);
+        drawDot(posX, posY, 'rgba(255,255,255,.5)', 1, this._engineCtx);
 
         linksCoordinates.push({
           x: posX,
@@ -146,25 +176,27 @@
         });
       }
 
-      // Links
-      this._engineCtx.strokeStyle = 'rgba(255,105,180,.5)';
-      this._engineCtx.beginPath();
-      this._engineCtx.moveTo(linksCoordinates[0].x, linksCoordinates[0].y);
-      linksCoordinates.forEach(function(point, index) {
-        if (index !== 0) {
-          this._engineCtx.lineTo(point.x, point.y);
-        }
-      }.bind(this));
-      this._engineCtx.closePath();
-      this._engineCtx.stroke();
+      if(linksCoordinates.length) {
+        // Links
+        this._engineCtx.strokeStyle = 'rgba(255,105,180,.5)';
+        this._engineCtx.beginPath();
+        this._engineCtx.moveTo(linksCoordinates[0].x, linksCoordinates[0].y);
+        linksCoordinates.forEach(function(point, index) {
+          if (index !== 0) {
+            this._engineCtx.lineTo(point.x, point.y);
+          }
+        }.bind(this));
+        this._engineCtx.closePath();
+        this._engineCtx.stroke();
 
-      // Links mid-points
-      linksCoordinates.forEach(function(point, index, points) {
-        var start = point, end = points[index + 1] || points[0];
-        var midX = (start.x + end.x) / 2, midY = (start.y + end.y) / 2;
-        drawDot(midX, midY, 'red', this._engineCtx);
-        drawDot(midX, midY, 'rgba(255,105,200,.5)', this._trailCtx);
-      }.bind(this));
+        // Links mid-points
+        linksCoordinates.forEach(function(point, index, points) {
+          var start = point, end = points[index + 1] || points[0];
+          var midX = (start.x + end.x) / 2, midY = (start.y + end.y) / 2;
+          drawDot(midX, midY, 'red', 1, this._engineCtx);
+          drawDot(midX, midY, this._color, this._size, this._trailCtx);
+        }.bind(this));
+      }
     }
   };
 
